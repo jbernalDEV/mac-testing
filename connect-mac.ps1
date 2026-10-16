@@ -1,5 +1,8 @@
 # Abre TigerVNC conectado a la Mac de GitHub (busca su IP en Tailscale).
 # La primera vez pide la contrasena VNC y la guarda en tu perfil (fuera del repo).
+# Uso:  connect-mac.ps1               (rapido, menos colores)
+#       connect-mac.ps1 -Calidad alta (colores completos, mas lento)
+param([ValidateSet("rapida", "alta")][string]$Calidad = "rapida")
 $ts = "C:\Program Files\Tailscale\tailscale.exe"
 $viewer = "C:\Program Files\TigerVNC\vncviewer.exe"
 $passwdFile = Join-Path $env:USERPROFILE ".vnc\mac-testing.passwd"
@@ -32,4 +35,6 @@ $ip = $mac.TailscaleIPs[0]
 
 Write-Host "Conectando a la Mac en $ip ..."
 # VncAuth: forzamos el metodo de contrasena VNC (la Mac ofrece metodos de Apple que TigerVNC no maneja)
-& $viewer "-SecurityTypes=VncAuth" "-PasswordFile=$passwdFile" "${ip}::5900"
+# ZRLE + menos colores: mucho menos trafico. Usa -Calidad alta si necesitas ver colores exactos.
+$quality = if ($Calidad -eq "alta") { @("-AutoSelect=1") } else { @("-AutoSelect=0", "-PreferredEncoding=ZRLE", "-FullColor=0", "-LowColorLevel=2") }
+& $viewer "-SecurityTypes=VncAuth" "-PasswordFile=$passwdFile" @quality "${ip}::5900"
