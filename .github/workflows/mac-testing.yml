@@ -47,7 +47,8 @@ jobs:
             nohup socat TCP-LISTEN:$p,bind=127.0.0.1,fork,reuseaddr TCP:$PC_IP:$((p + 10000)) >/dev/null 2>&1 &
           done
           # Espera a que Tailscale tenga ruta hacia tu PC
-          tailscale ping -c 10 --until-direct=false "$PC_IP" || true
+          sudo tailscale status || true
+          sudo tailscale ping -c 10 --until-direct=false "$PC_IP" || true
           for p in $PORTS; do
             nc -z -G 5 "$PC_IP" $((p + 10000)) && echo "OK   tu PC :$p" || echo "FALLA tu PC :$p (puerto $((p + 10000)) en Tailscale)"
           done
@@ -70,8 +71,9 @@ jobs:
           xcrun simctl boot "$DEVICE"
           open -a Simulator
           sleep 20
-          xcrun simctl openurl booted "${{ inputs.url }}"
-          open -a Safari "${{ inputs.url }}"
+          # Si la URL no carga, no apagamos la Mac: se puede reintentar desde VNC
+          xcrun simctl openurl booted "${{ inputs.url }}" || echo "AVISO: el simulador no pudo abrir la URL"
+          open -a Safari "${{ inputs.url }}" || true
 
       - name: Mantener la Mac encendida
         run: sleep $(( ${{ inputs.minutes }} * 60 ))
