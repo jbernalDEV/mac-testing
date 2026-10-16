@@ -46,14 +46,17 @@ jobs:
           for p in $PORTS; do
             nohup socat TCP-LISTEN:$p,bind=127.0.0.1,fork,reuseaddr TCP:$PC_IP:$((p + 10000)) >/dev/null 2>&1 &
           done
-          sleep 2
-          curl -s -o /dev/null -w "Frontend (localhost:3000) responde HTTP %{http_code}\n" http://localhost:3000 || echo "AVISO: tu PC no responde en :3000, revisa que la app y tailscale serve esten corriendo"
+          # Espera a que Tailscale tenga ruta hacia tu PC
+          tailscale ping -c 10 --until-direct=false "$PC_IP" || true
+          for p in $PORTS; do
+            nc -z -G 5 "$PC_IP" $((p + 10000)) && echo "OK   tu PC :$p" || echo "FALLA tu PC :$p (puerto $((p + 10000)) en Tailscale)"
+          done
+          curl -s -m 15 -o /dev/null -w "Frontend (localhost:3000) responde HTTP %{http_code}\n" http://localhost:3000 || echo "AVISO: tu PC no responde en :3000, revisa que la app y tailscale serve esten corriendo"
 
       - name: Habilitar VNC (Screen Sharing)
         env:
           VNC_PASSWORD: ${{ secrets.VNC_PASSWORD }}
         run: |
-          sudo dscl . -passwd /Users/runner "$VNC_PASSWORD"
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -privs -all \
             -clientopts -setvnclegacy -vnclegacy yes -setvncpw -vncpw "$VNC_PASSWORD" \
