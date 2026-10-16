@@ -47,6 +47,7 @@ jobs:
             nohup socat TCP-LISTEN:$p,bind=127.0.0.1,fork,reuseaddr TCP:$PC_IP:$((p + 10000)) >/dev/null 2>&1 &
           done
           # Espera a que Tailscale tenga ruta hacia tu PC
+          sudo tailscale ip -4 >/dev/null 2>&1 || { echo "ERROR: la Mac no entro a Tailscale. Revisa que el secret TS_AUTHKEY sea una key valida y no expirada"; exit 1; }
           sudo tailscale status || true
           sudo tailscale ping -c 10 --until-direct=false "$PC_IP" || true
           for p in $PORTS; do
