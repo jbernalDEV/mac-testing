@@ -1,0 +1,18 @@
+// Politica de acceso de Tailscale. Pegar en https://login.tailscale.com/admin/acls/file
+// - Tus dispositivos se ven entre ellos normalmente.
+// - Tu PC puede entrar a la Mac SOLO por VNC (5900).
+// - La Mac (tag:gh-mac) puede entrar a tu PC SOLO a los puertos de la app (13000-18080) y a nada mas.
+{
+  "tagOwners": {
+    "tag:gh-mac": ["autogroup:admin"]
+  },
+  "grants": [
+    { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
+    { "src": ["autogroup:member"], "dst": ["tag:gh-mac"], "ip": ["tcp:5900"] },
+    {
+      "src": ["tag:gh-mac"],
+      "dst": ["autogroup:member"],
+      "ip": ["tcp:13000", "tcp:13008", "tcp:13010", "tcp:14000", "tcp:18000", "tcp:18080"]
+    }
+  ]
+}

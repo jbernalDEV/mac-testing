@@ -3,40 +3,64 @@ name: Mac manual testing (Safari + iOS Simulator)
 on:
   workflow_dispatch:
     inputs:
-      url:
-        description: "URL a abrir (ej: http://mi-pc:5173 via Tailscale, o un preview deploy)"
+      pc:
+        description: "IP de Tailscale de tu PC (100.x.x.x)"
         required: true
-        default: "http://mi-pc:5173"
+      url:
+        description: "URL a abrir en la Mac (localhost = tu PC)"
+        required: true
+        default: "http://localhost:3000"
       minutes:
-        description: "Minutos que la Mac queda encendida"
+        description: "Minutos que la Mac queda encendida (max 120)"
         required: true
         default: "60"
 
+# El workflow no necesita ningun permiso sobre el repo
+permissions: {}
+
 jobs:
   mac:
+    # Solo el dueño del repo puede encender la Mac
+    if: github.actor == github.repository_owner
     runs-on: macos-15
-    timeout-minutes: 180
+    timeout-minutes: 150
+    env:
+      PC_IP: ${{ inputs.pc }}
+      # Puerto local en la Mac -> puerto en tu PC (via `tailscale serve`, puerto + 10000)
+      PORTS: "3000 3008 3010 4000 8000 8080"
     steps:
-      - name: Conectar a Tailscale (red privada con tu PC)
+      - name: Validar inputs
+        run: |
+          [[ "$PC_IP" =~ ^100\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "pc debe ser una IP de Tailscale 100.x.x.x"; exit 1; }
+          [[ "${{ inputs.minutes }}" =~ ^[0-9]+$ ]] && [ "${{ inputs.minutes }}" -le 120 ] || { echo "minutes debe ser 1-120"; exit 1; }
+
+      - name: Conectar a Tailscale (la key tiene el tag tag:gh-mac)
         uses: tailscale/github-action@v3
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
           hostname: gh-mac
 
+      - name: Reenviar localhost de la Mac hacia tu PC
+        run: |
+          brew install socat >/dev/null
+          for p in $PORTS; do
+            nohup socat TCP-LISTEN:$p,bind=127.0.0.1,fork,reuseaddr TCP:$PC_IP:$((p + 10000)) >/dev/null 2>&1 &
+          done
+          sleep 2
+          curl -s -o /dev/null -w "Frontend (localhost:3000) responde HTTP %{http_code}\n" http://localhost:3000 || echo "AVISO: tu PC no responde en :3000, revisa que la app y tailscale serve esten corriendo"
+
       - name: Habilitar VNC (Screen Sharing)
         env:
           VNC_PASSWORD: ${{ secrets.VNC_PASSWORD }}
         run: |
-          # Password del usuario 'runner' (para el login de macOS)
           sudo dscl . -passwd /Users/runner "$VNC_PASSWORD"
-          # Activa Remote Management con password VNC "legacy" (max 8 caracteres)
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -privs -all \
             -clientopts -setvnclegacy -vnclegacy yes -setvncpw -vncpw "$VNC_PASSWORD" \
             -restart -agent -console
-          echo "Conectate con tu cliente VNC a: gh-mac:5900  (o la IP 100.x de Tailscale)"
+          echo "Conecta TigerVNC a: gh-mac:5900"
 
-      - name: Arrancar simulador de iPhone y abrir la URL en Safari
+      - name: Arrancar simulador de iPhone y abrir la URL
         run: |
           DEVICE=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -oE '[0-9A-F-]{36}')
           echo "Simulador: $DEVICE"
@@ -44,7 +68,6 @@ jobs:
           open -a Simulator
           sleep 20
           xcrun simctl openurl booted "${{ inputs.url }}"
-          # Safari de macOS tambien, por si quieres probar desktop
           open -a Safari "${{ inputs.url }}"
 
       - name: Mantener la Mac encendida
