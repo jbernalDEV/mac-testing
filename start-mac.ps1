@@ -1,4 +1,4 @@
-# Enciende una Mac en GitHub Actions conectada a tu PC via Tailscale.
+﻿# Enciende una Mac en GitHub Actions conectada a tu PC via Tailscale.
 # Uso:  .\start-mac.ps1                 (60 min, abre http://localhost:3000)
 #       .\start-mac.ps1 -Minutes 30 -Url "http://localhost:3000/login"
 param(
@@ -29,5 +29,5 @@ $run = gh run list -R $repo -w mac-testing.yml -L 1 --json url --jq '.[0].url'
 
 Write-Host ""
 Write-Host "Mac encendiendose (~2-3 min). Progreso: $run"
-Write-Host "Cuando el paso 'Habilitar VNC' termine, abre TigerVNC y conecta a:  gh-mac:5900"
+Write-Host "Cuando el paso 'Habilitar VNC' termine, corre:  .\connect-mac.ps1"
 Write-Host "Para apagar todo:  .\stop-mac.ps1"
