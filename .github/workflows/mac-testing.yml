@@ -59,10 +59,24 @@ jobs:
         env:
           VNC_PASSWORD: ${{ secrets.VNC_PASSWORD }}
         run: |
+          # Permisos de macOS (TCC) para que VNC pueda enviar la imagen y recibir mouse/teclado;
+          # sin esto la pantalla llega negra
+          now=$(date +%s)
+          for db in "/Library/Application Support/com.apple.TCC/TCC.db" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"; do
+            [ -f "$db" ] || continue
+            for service in kTCCServiceScreenCapture kTCCServicePostEvent kTCCServiceAccessibility; do
+              for client in com.apple.screensharing.agent com.apple.RemoteDesktopAgent com.apple.screensharing; do
+                sudo sqlite3 "$db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, flags, last_modified) VALUES ('$service', '$client', 0, 2, 4, 1, 0, $now);" || true
+              done
+              sudo sqlite3 "$db" "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version, flags, last_modified) VALUES ('$service', '/usr/libexec/screensharingd', 1, 2, 4, 1, 0, $now);" || true
+            done
+          done
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -privs -all \
             -clientopts -setvnclegacy -vnclegacy yes -setvncpw -vncpw "$VNC_PASSWORD" \
             -restart -agent -console
+          # Reinicia Screen Sharing para que tome los permisos nuevos
+          sudo launchctl kickstart -k system/com.apple.screensharing || true
           echo "Conecta TigerVNC a: gh-mac:5900"
 
       - name: Arrancar simulador de iPhone y abrir la URL
