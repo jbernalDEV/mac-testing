@@ -69,9 +69,9 @@ jobs:
         run: |
           DEVICE=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -oE '[0-9A-F-]{36}')
           echo "Simulador: $DEVICE"
-          xcrun simctl boot "$DEVICE"
           open -a Simulator
-          sleep 20
+          # Arranca el iPhone y espera hasta que termine de iniciar
+          xcrun simctl bootstatus "$DEVICE" -b
           # Si la URL no carga, no apagamos la Mac: se puede reintentar desde VNC
           xcrun simctl openurl booted "${{ inputs.url }}" || echo "AVISO: el simulador no pudo abrir la URL"
           open -a Safari "${{ inputs.url }}" || true
